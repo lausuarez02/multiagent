@@ -35,24 +35,26 @@ The system consists of several specialized agents:
 
 ## 📁 Project Structure
 
+```
 src/
 ├── agents/
-│ ├── vcmilei/ # Main decision-making agent
-│ ├── reports/ # Report generation agents
-│ │ ├── market/
-│ │ ├── news/
-│ │ └── social/
-│ ├── legal/ # Legal compliance checking
-│ └── research/ # Market research agents
-│ ├── bullish/
-│ └── bearish/
-├── data/ # Data collection modules
-│ ├── market/
-│ ├── news/
-│ └── social/
-├── blockchain/ # Blockchain integration
-├── memory/ # System memory management
-└── utils/ # Utility functions
+│   ├── vcmilei/           # Main decision-making agent
+│   ├── reports/           # Report generation agents
+│   │   ├── market/
+│   │   ├── news/
+│   │   └── social/
+│   ├── legal/            # Legal compliance checking
+│   └── research/         # Market research agents
+│       ├── bullish/
+│       └── bearish/
+├── data/                 # Data collection modules
+│   ├── market/
+│   ├── news/
+│   └── social/
+├── blockchain/           # Blockchain integration
+├── memory/              # System memory management
+└── utils/               # Utility functions
+```
 
 
 ## 🚀 Getting Started
