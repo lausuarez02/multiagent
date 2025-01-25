@@ -7,13 +7,15 @@
     },
     "scripts": {
         "test": "vitest",
-        "test:market": "vitest src/data/market/__tests__/market.test.ts"
+        "test:market": "vitest src/data/market/__tests__/market.test.ts",
+        "test:news": "vitest src/data/news/__tests__/news.test.ts"
     },
     "dependencies": {
         "@ai-sdk/openai": "^1.0.7",
         "@supabase/supabase-js": "^2.47.0",
         "ai": "^4.0.12",
         "axios": "^1.7.9",
+        "cheerio": "^1.0.0",
         "openai": "^4.76.1",
         "viem": "^2.22.13",
         "vitest": "^3.0.4"
