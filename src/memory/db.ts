@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { OpenAIEmbeddings } from '@ai-sdk/openai';
+import { openai } from '@ai-sdk/openai';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -7,9 +7,7 @@ const supabase = createClient(
 );
 
 // Initialize OpenAI embeddings
-const embeddings = new OpenAIEmbeddings({
-  apiKey: process.env.OPENAI_API_KEY!
-});
+const model =  openai.embedding('text-embedding-3-large');
 
 export interface Investment {
   id: string;
@@ -37,7 +35,7 @@ export interface AnalysisReport {
 export interface Memory {
   id: string;
   content: string;
-  type: 'Investment' | 'Analysis' | 'Learning';
+  type: 'Investment' | 'Analysis' | 'Learning' | 'Legal';
   embedding: number[];
   created_at: Date;
   relevance_score?: number;
@@ -69,7 +67,7 @@ export const db = {
 
   // Analysis operations
   async saveAnalysisReport(report: Omit<AnalysisReport, 'id' | 'embedding'>) {
-    const embedding = await embeddings.embedQuery(JSON.stringify(report.content));
+    const embedding = await model.doEmbed({ values: [JSON.stringify(report.content)] });
     
     const { data, error } = await supabase
       .from('analysis_reports')
@@ -83,7 +81,7 @@ export const db = {
 
   // Memory operations with RAG support
   async saveMemory(content: string, type: Memory['type']) {
-    const embedding = await embeddings.embedQuery(content);
+    const embedding = await model.doEmbed({ values: [content] });
     
     const { data, error } = await supabase
       .from('memories')
@@ -101,7 +99,7 @@ export const db = {
   },
 
   async searchSimilarMemories(query: string, limit: number = 5) {
-    const queryEmbedding = await embeddings.embedQuery(query);
+    const queryEmbedding = await model.doEmbed({ values: [query] });
     
     const { data, error } = await supabase.rpc('match_memories', {
       query_embedding: queryEmbedding,
