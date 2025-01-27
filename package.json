@@ -8,7 +8,8 @@
     "scripts": {
         "test": "vitest",
         "test:market": "vitest src/data/market/__tests__/market.test.ts",
-        "test:news": "vitest src/data/news/__tests__/news.test.ts"
+        "test:news": "vitest src/data/news/__tests__/news.test.ts",
+        "test:social": "vitest src/data/social/__tests__/social.test.ts"
     },
     "dependencies": {
         "@ai-sdk/openai": "^1.0.7",
