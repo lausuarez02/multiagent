@@ -1,36 +1,59 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { collectSocialMetrics } from "../../../data/social";
 
 export const getSocialToolkit = () => {
   return {
     fetchSocialTrends: tool({
-      description: "Fetches trending topics on social media",
+      description: "Fetches social media metrics and trends for a specific user",
       parameters: z.object({
-        platform: z.string().describe("Social media platform to fetch trends from"),
+        username: z.string().describe("Twitter username to fetch metrics for"),
+        platform: z.enum(["twitter"]).describe("Social media platform (only twitter supported)"),
         dateRange: z.string().describe("Date range for the trends"),
       }),
-      execute: async ({ platform, dateRange }) => {
-        console.log("======== fetchSocialTrends Tool =========");
-        console.log(`[fetchSocialTrends] Fetching trends for platform: ${platform} within date range: ${dateRange}`);
-        // Implementation for fetching social trends
-        return {
-          trends: ["Trend 1", "Trend 2"],
-          sentiment: "positive",
-        };
+      execute: async ({ username, platform, dateRange }) => {
+        console.log(`[fetchSocialTrends] Fetching ${platform} metrics for user: ${username}`);
+        
+        try {
+          const metrics = await collectSocialMetrics(username);
+          return {
+            success: true,
+            data: {
+              profile: metrics
+            }
+          };
+        } catch (error: any) {
+          console.error(`[fetchSocialTrends] Error:`, error.message);
+          return {
+            success: false,
+            error: error.message
+          };
+        }
       },
     }),
-    analyzeSocialSentiment: tool({
-      description: "Analyzes sentiment on social media",
+
+    analyzeSocialMetrics: tool({
+      description: "Analyzes social media metrics and provides insights",
       parameters: z.object({
-        content: z.string().describe("Content to analyze sentiment for"),
+        metrics: z.object({
+          username: z.string(),
+          displayName: z.string(),
+          followers: z.number(),
+          following: z.number(),
+          tweets: z.number(),
+          description: z.string(),
+          joinDate: z.string(),
+          location: z.string(),
+          website: z.string().optional(),
+          verified: z.boolean(),
+          profileImage: z.string().optional(),
+        }).describe("Social metrics to analyze"),
       }),
-      execute: async ({ content }) => {
-        console.log("======== analyzeSocialSentiment Tool =========");
-        console.log(`[analyzeSocialSentiment] Analyzing sentiment for content: ${content}`);
-        // Implementation for analyzing social sentiment
+      execute: async ({ metrics }) => {
+        console.log(`[analyzeSocialMetrics] Analyzing metrics for ${metrics.username}`);
         return {
-          sentiment: "neutral",
-          analysis: "Detailed sentiment analysis",
+          success: true,
+          data: metrics
         };
       },
     }),

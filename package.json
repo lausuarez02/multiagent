@@ -13,16 +13,28 @@
         "test:legaldata": "vitest src/data/legal/__tests__/legal.test.ts",
         "test:marketagent": "vitest src/agents/reports/__tests__/market.test.ts",
         "test:socialagent": "vitest src/agents/reports/__tests__/social.test.ts",
-        "test:newsagent": "vitest src/agents/reports/__tests__/news.test.ts"
+        "test:newsagent": "vitest src/agents/reports/__tests__/news.test.ts",
+        "start": "tsx src/index.ts",
+        "build": "tsc"
     },
     "dependencies": {
         "@ai-sdk/openai": "^1.0.7",
+        "@hono/node-server": "^1.13.7",
         "@supabase/supabase-js": "^2.47.0",
         "ai": "^4.0.12",
         "axios": "^1.7.9",
         "cheerio": "^1.0.0",
+        "dotenv": "^16.4.7",
+        "figlet": "^1.8.0",
+        "hono": "^4.6.19",
         "openai": "^4.76.1",
         "viem": "^2.22.13",
         "vitest": "^3.0.4"
+    },
+    "devDependencies": {
+        "@types/figlet": "^1.7.0",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.3"
     }
 }

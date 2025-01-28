@@ -18,9 +18,10 @@ export class NewsAgent {
    * @param data - The data to handle
    */
   async handleNewsRequest(data: any): Promise<void> {
-    if (data) {
-      console.log(
-        `[${this.name}] received news report request: ${data.dateRange}`
+    try {
+      if (data) {
+        console.log(
+          `[${this.name}] received news report request: ${data.dateRange}`
       );
     }
 
@@ -29,17 +30,22 @@ export class NewsAgent {
     console.log(`[${this.name}] News report generated: ${response.text}`);
 
     await db.saveMemory(response.text, 'Analysis');
+  } catch (error:any) {
+    console.error(`[${this.name}] Error handling news request:`, error);
+    throw error; // Re-throw if you want to handle it at a higher level
   }
+}
 
   /**
    * @dev Generates a news report
    * @param newsData - The data for the news report generation
    */
   async generateNewsReport(newsData: any): Promise<any> {
-    const toolkit = getNewsToolkit();
+    try {
+      const toolkit = getNewsToolkit();
 
     const response = await generateText({
-      model: openai(process.env.OPENAI_API_KEY!),
+      model: openai("gpt-4o-mini"!),
       system: NEWS_REPORT_PROMPT,
       messages: [
         {
@@ -53,7 +59,11 @@ export class NewsAgent {
     });
 
     return response;
+  }catch (error:any) {
+    console.error(`[${this.name}] Error generating news report:`, error);
+    throw error;
   }
+}
 
   /**
    * @param data - The data to handle
