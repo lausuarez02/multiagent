@@ -39,7 +39,7 @@ export class MarketAgent {
     const toolkit = getMarketToolkit();
 
     const response = await generateText({
-      model: openai(process.env.OPENAI_API_KEY!),
+      model: openai("gpt-4o-mini"!),
       system: MARKET_REPORT_PROMPT,
       messages: [
         {

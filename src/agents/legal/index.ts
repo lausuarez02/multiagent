@@ -43,7 +43,7 @@ export class LegalAgent {
     this.address = address;
 
     const response = await generateText({
-      model: openai(process.env.OPENAI_API_KEY!),
+      model: openai("gpt-4o-mini"!),
       system: LEGAL_CONTRACT_PROMPT,
       prompt: CONTRACT_STARTING_PROMPT,
       messages: [
