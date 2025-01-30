@@ -80,6 +80,18 @@ export class VCMileiAgent {
     try {
       const toolkit = getVCMileiToolkit();
       
+      // Always check wallet balance first
+      const balanceCheck = await toolkit.checkWalletBalance.execute(
+        {},
+        { toolCallId: '', messages: [] }
+      );
+
+      // Get market metrics
+      // const marketMetrics = await toolkit.getMarketMetrics.execute(
+      //   { metric: 'all' },
+      //   { toolCallId: '', messages: [] }
+      // );
+
       // Always fetch relevant news first
       let newsContext = '';
       try {
@@ -97,56 +109,39 @@ export class VCMileiAgent {
         console.warn(`[${this.name}] Failed to fetch news context:`, error);
       }
 
-      // Format the response structure based on query type
-      const responseStructure = requestData.isInvestmentQuery ? 
-        {
-          type: "INVESTMENT_ANALYSIS",
-          decision: null,
+//       Market Metrics:
+// ${JSON.stringify(marketMetrics.data, null, 2)}
+      const context = `
+Current Portfolio Status:
+${JSON.stringify(balanceCheck.data, null, 2)}
+
+
+${newsContext}
+      `.trim();
+
+      // Update response structure to include investment actions
+      const responseStructure = {
+        type: "AUTONOMOUS_INVESTMENT",
+        market_analysis: {
+          sentiment: null,
+          key_metrics: null,
+          opportunities: [],
+        },
+        investment_action: {
+          type: null, // "SWAP" | "HOLD" | "INVEST"
+          fromToken: null,
+          toToken: null,
           amount: null,
-          network: null,
-          analysis: {
-            reasoning: null,
-            bullish_points: [],
-            bearish_points: [],
-            technical_metrics: {
-              meme_rating: null,
-              freedom_rating: null,
-              decentralization_score: null,
-              anti_state_rating: null
-            }
-          },
-          market_sentiment: {
-            short_term: null,
-            mid_term: null,
-            long_term: null
-          },
+          reasoning: [],
+        },
+        execution_results: null,
+        future_outlook: {
+          short_term: null,
+          mid_term: null,
           risks: [],
-          opportunities: [],
-          milei_catchphrase: null
-        } :
-        {
-          type: "MARKET_COMMENTARY",
-          main_thesis: null,
-          market_analysis: {
-            sentiment: null,
-            trend: null,
-            key_drivers: []
-          },
-          freedom_metrics: {
-            decentralization_impact: null,
-            anti_state_rating: null,
-            freedom_score: null
-          },
-          technical_outlook: {
-            short_term: null,
-            mid_term: null,
-            long_term: null
-          },
-          key_points: [],
-          risks: [],
-          opportunities: [],
-          memes_and_catchphrases: []
-        };
+        },
+        milei_catchphrase: null
+      };
 
       const content = requestData.isInvestmentQuery
         ? `Investment Analysis Request:
@@ -160,7 +155,7 @@ export class VCMileiAgent {
 
       const response = await generateText({
         model: openai("gpt-4o-mini"),
-        system: VC_MILEI_PROMPT,
+        system: context + VC_MILEI_PROMPT,
         messages: [
           {
             role: "user",
