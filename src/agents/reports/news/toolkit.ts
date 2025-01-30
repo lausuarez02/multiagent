@@ -1,36 +1,63 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { collectNews } from "../../../data/news";
 
 export const getNewsToolkit = () => {
   return {
-    fetchLatestHeadlines: tool({
-      description: "Fetches the latest news headlines for a given topic",
+    fetchLatestNews: tool({
+      description: "Fetches the latest news articles",
       parameters: z.object({
-        topic: z.string().describe("Topic to fetch news headlines for"),
-        dateRange: z.string().describe("Date range for the news"),
+        asset: z.string().optional().describe("Currency or company name to fetch news for"),
       }),
-      execute: async ({ topic, dateRange }) => {
-        console.log("======== fetchLatestHeadlines Tool =========");
-        console.log(`[fetchLatestHeadlines] Fetching headlines for topic: ${topic} within date range: ${dateRange}`);
-        // Implementation for fetching news headlines
-        return {
-          headlines: ["Headline 1", "Headline 2"],
-          summary: "Summary of the news",
-        };
+      execute: async ({ asset }) => {
+        console.log(`[fetchLatestNews] Fetching news for currency: ${asset || 'all'}`);
+        
+        try {
+          const newsData = await collectNews(asset);
+          return {
+            success: true,
+            data: {
+              news: newsData.items.map((article:any) => ({
+                title: article.title,
+                url: article.url,
+                source: article.source,
+                published_at: article.published_at,
+                description: article.description,
+                thumbnail: article.thumbnail
+              }))
+            }
+          };
+        } catch (error: any) {
+          console.error(`[fetchLatestNews] Error:`, error.message);
+          return {
+            success: false,
+            error: error.message
+          };
+        }
       },
     }),
-    analyzeNewsImpact: tool({
-      description: "Analyzes the impact of news on the market",
+
+    analyzeNewsContent: tool({
+      description: "Analyzes news content",
       parameters: z.object({
-        newsContent: z.string().describe("Content of the news to analyze"),
+        news: z.array(z.object({
+          title: z.string(),
+          url: z.string(),
+          source: z.string(),
+          published_at: z.string(),
+          description: z.string().optional(),
+          thumbnail: z.string().optional(),
+        })).describe("News articles to analyze"),
       }),
-      execute: async ({ newsContent }) => {
-        console.log("======== analyzeNewsImpact Tool =========");
-        console.log(`[analyzeNewsImpact] Analyzing impact for news content: ${newsContent}`);
-        // Implementation for analyzing news impact
+      execute: async ({ news }) => {
+        console.log(`[analyzeNewsContent] Analyzing ${news.length} articles`);
         return {
-          impact: "positive",
-          details: "Details of the impact",
+          success: true,
+          data: {
+            total: news.length,
+            sources: [...new Set(news.map(article => article.source))],
+            latest_date: news[0]?.published_at
+          }
         };
       },
     }),

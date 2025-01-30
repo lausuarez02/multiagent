@@ -28,7 +28,7 @@
         "figlet": "^1.8.0",
         "hono": "^4.6.19",
         "openai": "^4.76.1",
-        "viem": "^2.22.13",
+        "viem": "^2.22.17",
         "vitest": "^3.0.4"
     },
     "devDependencies": {
