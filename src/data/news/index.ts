@@ -10,10 +10,10 @@ export async function collectNews(currency?: string) {
       timestamp: new Date().toISOString(),
       total_items: news.length,
       items: news,
-      analysis: {
-        sentiment: calculateNewsSentiment(news),
-        trending_topics: extractTrendingTopics(news)
-      }
+      // analysis: {
+      //   sentiment: calculateNewsSentiment(news),
+      //   trending_topics: extractTrendingTopics(news)
+      // }
     };
   } catch (error) {
     console.error('Error collecting news:', error);

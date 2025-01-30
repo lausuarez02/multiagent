@@ -4,6 +4,15 @@ import { SOCIAL_REPORT_PROMPT } from "../../../prompts/socialReport";
 import { getSocialToolkit } from "./toolkit";
 import { db } from "../../../memory/db";
 
+interface SocialReport {
+  profile: any;
+  engagement: any;
+  risk_assessment: any;
+  analysis: any;
+  dateRange: any;
+  additionalNotes?: string[];
+}
+
 export class SocialAgent {
   name: string;
 
@@ -27,29 +36,37 @@ export class SocialAgent {
         };
       }
 
-      console.log(
-        `[${this.name}] received social report request:`, data.dateRange
-      );
-
+      console.log(`[${this.name}] received social report request:`, data.dateRange);
       const response = await this.generateSocialReport(data);
       
-      // Check if we have a valid response with text
-      // if (!response?.text) {
-      //   return {
-      //     success: false,
-      //     error: 'No report text generated',
-      //     timestamp: new Date().toISOString()
-      //   };
-      // }
-
-      console.log(`[${response.text}] Social report generated successfully`);
-      
-      // Parse the JSON text
-      let parsedReport;
+      let parsedReport: SocialReport;
       try {
-        parsedReport = JSON.parse(response.text);
+        // Extract JSON from the response
+        const jsonMatch = response.text.match(/```json\n([\s\S]*?)\n```/);
+        const jsonStr = jsonMatch ? jsonMatch[1] : response.text;
+        const rawReport = JSON.parse(jsonStr);
+
+        // Format the report maintaining the AI's analysis
+        parsedReport = {
+          profile: rawReport.profile_stats,
+          engagement: rawReport.engagement_metrics,
+          risk_assessment: rawReport.risk_assessment,
+          analysis: rawReport.analysis || {},
+          dateRange: rawReport.date_range
+        };
+
+        // Extract any additional notes if present
+        const notesMatch = response.text.match(/### Additional Notes:\n([\s\S]*?)$/);
+        if (notesMatch) {
+          parsedReport.additionalNotes = notesMatch[1]
+            .split('\n')
+            .filter((note:any) => note.trim())
+            .map((note:any) => note.replace('- ', '').trim());
+        }
+
       } catch (e) {
         console.error(`[${this.name}] Error parsing report JSON:`, e);
+        console.log(`[${this.name}] Raw text that failed to parse:`, response.text);
         parsedReport = response.text;
       }
 
@@ -63,9 +80,6 @@ export class SocialAgent {
           toolCalls: step.toolCalls?.map((call:any) => call.function?.name) || []
         })) || []
       };
-
-      // Save the final response text
-      // await db.saveMemory(response.text, 'Analysis');
 
       return {
         success: true,
