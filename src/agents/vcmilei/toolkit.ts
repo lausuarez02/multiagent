@@ -139,24 +139,25 @@ export const getVCMileiToolkit = () => {
     swapTokens: tool({
       description: "Swaps between ETH and MODE tokens on Mode Network",
       parameters: z.object({
-        tokenIn: z.enum(['ETH', 'MODE']).describe("Input token (ETH or MODE)"),
-        tokenOut: z.enum(['ETH', 'MODE']).describe("Output token (ETH or MODE)"),
-        amountIn: z.number().describe("Amount of input token to swap"),
-        slippageTolerance: z.number().optional().describe("Maximum slippage tolerance in percentage (default: 0.5)"),
+        fromToken: z.enum(['ETH', 'MODE']).describe("Input token (ETH or MODE)"),
+        toToken: z.enum(['ETH', 'MODE']).describe("Output token (ETH or MODE)"),
+        amount: z.string().describe("Amount of input token to swap"),
+        slippage: z.string().describe("Maximum slippage tolerance in percentage"),
       }),
-      execute: async ({ tokenIn, tokenOut, amountIn, slippageTolerance = 0.5 }) => {
-        console.log(`[swapTokens] Initiating swap: ${amountIn} ${tokenIn} to ${tokenOut}`);
+      execute: async ({ fromToken, toToken, amount, slippage }) => {
+        console.log(`[swapTokens] Initiating swap: ${amount} ${fromToken} to ${toToken}`);
         
         try {
-          if (tokenIn === tokenOut) {
+          if (fromToken === toToken) {
             throw new Error('Cannot swap same tokens');
           }
 
           // Convert amount to Wei
-          const amountInWei = BigInt(Math.floor(amountIn * 10**18));
+          const amountInWei = BigInt(Math.floor(parseFloat(amount) * 10**18));
+          const slippagePercent = parseFloat(slippage);
 
           // Calculate minAmountOut with slippage tolerance
-          const minAmountOut = BigInt(Number(amountInWei) * (1 - slippageTolerance/100));
+          const minAmountOut = BigInt(Number(amountInWei) * (1 - slippagePercent/100));
 
           // Get token addresses
           const tokenAddresses = {
@@ -164,8 +165,8 @@ export const getVCMileiToolkit = () => {
             'MODE': MODE_TOKEN_ADDRESS,
           };
 
-          const tokenInAddress = tokenAddresses[tokenIn];
-          const tokenOutAddress = tokenAddresses[tokenOut];
+          const tokenInAddress = tokenAddresses[fromToken];
+          const tokenOutAddress = tokenAddresses[toToken];
 
           const txHash = await wallet.swap(
             tokenInAddress,
@@ -178,10 +179,10 @@ export const getVCMileiToolkit = () => {
             success: true,
             data: {
               transactionHash: txHash,
-              amountIn,
-              tokenIn,
-              tokenOut,
-              slippageTolerance,
+              amountIn: Number(amountInWei) / 10**18,
+              tokenIn: fromToken,
+              tokenOut: toToken,
+              slippageTolerance: slippagePercent,
               expectedMinimumOut: Number(minAmountOut) / 10**18
             }
           };
@@ -191,10 +192,10 @@ export const getVCMileiToolkit = () => {
             success: false,
             error: error.message,
             details: {
-              tokenIn,
-              tokenOut,
-              amountIn,
-              slippageTolerance
+              fromToken,
+              toToken,
+              amount,
+              slippage
             }
           };
         }
