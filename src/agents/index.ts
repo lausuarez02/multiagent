@@ -85,7 +85,7 @@ export const registerAgentFactories = () => {
     return agent;
   };
 
-  const createVCMileiAgent = () => {
+  const createVCMileiAgent = async () => {
     // Simulate animation with multiple frames
     const frames = [
       chalk.magenta(`
@@ -130,7 +130,8 @@ export const registerAgentFactories = () => {
     });
 
     console.log(chalk.cyan(`[registerAgentFactories] initializing VCMilei agent...`));
-    const agent = new VCMileiAgent("VCMilei");
+    const agent = new VCMileiAgent();
+    await agent.init();
     console.log(chalk.green(`[registerAgentFactories] VCMilei agent initialized.`));
     return agent;
   };
@@ -143,4 +144,22 @@ export const registerAgentFactories = () => {
     createSocialAgent,
     createVCMileiAgent,
   };
+};
+
+// Export agent classes directly
+export { VCMileiAgent, NewsAgent, SocialAgent };
+
+// Export factory functions
+export const createVCMileiAgent = async () => {
+  const agent = new VCMileiAgent();
+  await agent.init();
+  return agent;
+};
+
+export const createNewsAgent = () => {
+  return new NewsAgent("NewsAgent");
+};
+
+export const createSocialAgent = () => {
+  return new SocialAgent("SocialAgent");
 };

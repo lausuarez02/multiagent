@@ -3,72 +3,169 @@ import { openai } from "@ai-sdk/openai";
 import { VC_MILEI_PROMPT } from "../../prompts/vcMilei";
 import { getVCMileiToolkit } from "./toolkit";
 import { db } from "../../memory/db";
+import { TwitterClient } from "../../utils/twitter";
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { getTwitterClient } from "../../utils/twitter/singleton";
+
+interface ProcessedTweets {
+  processedIds: string[];
+  lastUpdated: string;
+}
 
 export class VCMileiAgent {
+  private processedTweetsPath: string;
+  private twitter!: TwitterClient;
+  private processedTweets: ProcessedTweets = {
+    processedIds: [],
+    lastUpdated: new Date().toISOString()
+  };
+
   name: string;
 
   /**
    * @param name - The name of the agent
    */
-  constructor(name: string) {
-    this.name = name;
+  constructor() {
+    this.name = "VCMilei";
+    this.processedTweetsPath = path.join(process.cwd(), 'data', 'processed_tweets.json');
+  }
+
+  async init() {
+    console.log(`[${this.name}] Initializing...`);
+    
+    // Ensure data directory exists
+    await this.ensureDataDirectory();
+    
+    // Load processed tweets
+    await this.loadProcessedTweets();
+
+    // Initialize Twitter client
+    console.log(`[${this.name}] Initializing Twitter client...`);
+    this.twitter = await getTwitterClient();
+    
+    console.log(`[${this.name}] Initialization complete!!!!!!!`);
+  }
+
+  private async ensureDataDirectory() {
+    const dataDir = path.dirname(this.processedTweetsPath);
+    try {
+      await fs.access(dataDir);
+    } catch {
+      await fs.mkdir(dataDir, { recursive: true });
+    }
+  }
+
+  private async loadProcessedTweets() {
+    try {
+      const data = await fs.readFile(this.processedTweetsPath, 'utf-8');
+      this.processedTweets = JSON.parse(data);
+      console.log(`[${this.name}] Loaded ${this.processedTweets.processedIds.length} processed tweets`);
+    } catch (error) {
+      // If file doesn't exist or is invalid, use default empty state
+      console.log(`[${this.name}] No existing processed tweets file, starting fresh`);
+      await this.saveProcessedTweets();
+    }
+  }
+
+  private async saveProcessedTweets() {
+    try {
+      // Update the lastUpdated timestamp
+      this.processedTweets.lastUpdated = new Date().toISOString();
+      
+      // Save to file
+      await fs.writeFile(
+        this.processedTweetsPath,
+        JSON.stringify(this.processedTweets, null, 2),
+        'utf-8'
+      );
+    } catch (error) {
+      console.error(`[${this.name}] Error saving processed tweets:`, error);
+    }
+  }
+
+  private async markTweetAsProcessed(tweetId: string) {
+    if (!this.processedTweets.processedIds.includes(tweetId)) {
+      this.processedTweets.processedIds.push(tweetId);
+      // Keep only the last 1000 processed tweets
+      if (this.processedTweets.processedIds.length > 1000) {
+        this.processedTweets.processedIds = this.processedTweets.processedIds.slice(-1000);
+      }
+      await this.saveProcessedTweets();
+    }
+  }
+
+  private isTweetProcessed(tweetId: string): boolean {
+    return this.processedTweets.processedIds.includes(tweetId);
   }
 
   /**
-   * @param data - The data to handle
+   * @param request - The request to handle
    */
-  async handleRequest(data: any): Promise<any> {
+  async handleRequest(request: any) {
     try {
-      // Determine if this is an investment analysis or general query
-      const isInvestmentQuery = data.type === 'investment';
-      
-      const response = await this.generateResponse({
-        ...data,
-        isInvestmentQuery
-      });
+        const toolkit = getVCMileiToolkit();
 
-      let parsedResponse: any;
-      try {
-        parsedResponse = JSON.parse(response.text);
-      } catch (e) {
-        // If it's not JSON (like for general queries), use raw text
-        parsedResponse = response.text;
-      }
+        // For mentions/replies
+        if (request.context?.notificationType === 'mention') {
+            // First check news for context
+            const newsReport = await toolkit.getNewsReport.execute({
+                asset: '',  // Empty string for latest news
+                timeframe: '24h',
+                limit: 5
+            }, { toolCallId: '', messages: [] });
+            
+            const response = await generateText({
+                model: openai("gpt-4-turbo"),
+                messages: [
+                    { role: "system", content: VC_MILEI_PROMPT },
+                    { 
+                        role: "user", 
+                        content: `Context: ${JSON.stringify(newsReport.data)}\n\nSomeone tweeted at you: "${request.query}"\nRespond naturally as VCMilei, using relevant news context if applicable. NO JSON, NO ANALYSIS STRUCTURE, just a natural tweet response.`
+                    }
+                ],
+                temperature: 0.9
+            });
 
-      const metadata = {
-        usage: response.usage || {},
-        finishReason: response.finishReason,
-        toolResults: response.toolResults || [],
-        queryType: isInvestmentQuery ? 'investment' : 'general'
-      };
+            // Reply to the tweet
+            if (request.context.tweetId) {
+                await this.twitter.replyToTweet(response.text, request.context.tweetId);
+            }
+            return { text: response.text };
+        }
+        
+        // For news updates
+        if (request.type === 'news') {
+            const newsReport = await toolkit.getNewsReport.execute({
+              asset: '',  // Empty string for latest news
+              timeframe: '24h',
+              limit: 5
+          }, { toolCallId: '', messages: [] });  // Empty query for latest news
+            
+            if (newsReport.success && newsReport.data) {
+                const response = await generateText({
+                    model: openai("gpt-4-turbo"),
+                    messages: [
+                        { role: "system", content: VC_MILEI_PROMPT },
+                        { 
+                            role: "user", 
+                            content: `Analyze and comment on this news: ${JSON.stringify(newsReport.data)}\nCreate a tweet thread about interesting findings. Be natural, NO JSON format.`
+                        }
+                    ],
+                    temperature: 0.9
+                });
 
-      // Save to memory with appropriate context
-    //   await db.saveMemory(JSON.stringify({
-    //     query: data,
-    //     response: parsedResponse,
-    //     timestamp: new Date().toISOString()
-    //   }), isInvestmentQuery ? 'Investment' : 'Commentary');
+                if (response.text.trim()) {
+                    await this.twitter.postTweetThread([response.text]);
+                }
+                return { text: response.text };
+            }
+        }
 
-      return {
-        success: true,
-        data: {
-          response: parsedResponse,
-          metadata
-        },
-        timestamp: new Date().toISOString()
-      };
-
-    } catch (error: any) {
-      console.error(`[${this.name}] Error handling request:`, {
-        message: error.message,
-        stack: error.stack,
-        error
-      });
-      return {
-        success: false,
-        error: error.message || "An unknown error occurred",
-        timestamp: new Date().toISOString()
-      };
+        return null;
+    } catch (error) {
+        console.error(`[${this.name}] Error handling request:`, error);
+        throw error;
     }
   }
 
@@ -76,8 +173,27 @@ export class VCMileiAgent {
    * @dev Generates a response using the VCMilei persona
    * @param requestData - The data for generating the response
    */
-  async generateResponse(requestData: any): Promise<any> {
+  async generateResponse(request: any) {
     try {
+      // If it's a mention/reply, format as a conversational response
+      if (request.context?.notificationType === 'mention') {
+        const response = await generateText({
+          model: openai("gpt-4o-mini"),
+          messages: [
+            { role: "system", content: VC_MILEI_PROMPT },
+            { 
+              role: "user", 
+              content: `Someone tweeted at you: "${request.query}"\nRespond naturally as VCMilei, in a conversational way. NO JSON, NO ANALYSIS STRUCTURE, just a natural tweet response.`
+            }
+          ],
+          temperature: 0.9
+        });
+
+        return {
+          text: response.text
+        };
+      }
+      
       const toolkit = getVCMileiToolkit();
       
       // Always check wallet balance first
@@ -95,15 +211,14 @@ export class VCMileiAgent {
       // Always fetch relevant news first
       let newsContext = '';
       try {
-        const newsResponse = await toolkit.getNewsReport.execute(
-          { 
-            asset: requestData.isInvestmentQuery ? requestData.project : requestData.query,
-          },
-          { toolCallId: '', messages: [] }
-        );
+        const newsReport = await toolkit.getNewsReport.execute({
+            asset: '',  // Empty string for latest news
+            timeframe: '24h',
+            limit: 5
+        }, { toolCallId: '', messages: [] });
         
-        if (newsResponse.success && newsResponse.data) {
-          newsContext = `Recent news context:\n${JSON.stringify(newsResponse.data, null, 2)}\n\n`;
+        if (newsReport.success && newsReport.data) {
+          newsContext = `Recent news context:\n${JSON.stringify(newsReport.data, null, 2)}\n\n`;
         }
       } catch (error) {
         console.warn(`[${this.name}] Failed to fetch news context:`, error);
@@ -143,14 +258,14 @@ ${newsContext}
         milei_catchphrase: null
       };
 
-      const content = requestData.isInvestmentQuery
+      const content = request.isInvestmentQuery
         ? `Investment Analysis Request:
-           Project: ${requestData.project}
-           Description: ${requestData.description}
-           Requested Amount: ${requestData.amount}
-           Network: ${requestData.network}
+           Project: ${request.project}
+           Description: ${request.description}
+           Requested Amount: ${request.amount}
+           Network: ${request.network}
            Expected Response Structure: ${JSON.stringify(responseStructure, null, 2)}`
-        : `Query: ${requestData.query}
+        : `Query: ${request.query}
            Expected Response Structure: ${JSON.stringify(responseStructure, null, 2)}`;
 
       const response = await generateText({
