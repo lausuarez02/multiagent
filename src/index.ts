@@ -81,7 +81,7 @@ const startSystem = async () => {
     } catch (error) {
       console.error('[News Check] Error:', error);
     }
-  }, 1000000); // Every 5 minutes
+  }, 900000);
 
   await notificationListener.start();
   console.log("======== VCMilei System Initialized =========");

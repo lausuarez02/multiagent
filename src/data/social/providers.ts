@@ -15,6 +15,21 @@ interface TwitterProfile {
   profileImage?: string;
 }
 
+interface TwitterAgentMetrics {
+  followers: number;
+  following: number;
+  tweets: number;
+  engagement: number;
+  interval: string;
+}
+
+interface NewsSearchResult {
+  title: string;
+  content: string;
+  date: string;
+  source: string;
+}
+
 export class SocialDataProvider {
   private readonly NITTER_INSTANCES = [
     'https://nitter.net',
@@ -22,6 +37,16 @@ export class SocialDataProvider {
     'https://nitter.1d4.us',
     'https://nitter.kavin.rocks',
   ];
+
+  private readonly apiKey: string;
+
+  constructor() {
+    const apiKey = process.env.COOKIE_API_KEY;
+    if (!apiKey) {
+      throw new Error('COOKIE_API_KEY environment variable is required');
+    }
+    this.apiKey = apiKey;
+  }
 
   async getTwitterProfile(username: string): Promise<TwitterProfile> {
     let lastError = null;
@@ -109,5 +134,51 @@ export class SocialDataProvider {
       profile.following >= 0 &&
       profile.tweets >= 0
     );
+  }
+
+  async getAgentMetrics(username: string, interval: string = '_7Days'): Promise<TwitterAgentMetrics> {
+    try {
+      const response = await axios.get(
+        `https://api.cookie.fun/v2/agents/twitterUsername/${username}`,
+        {
+          params: { interval },
+          headers: {
+            'x-api-key': this.apiKey
+          },
+          timeout: 5000
+        }
+      );
+
+      if (response.status === 200) {
+        return response.data;
+      }
+      throw new Error('Failed to fetch agent metrics');
+    } catch (error: any) {
+      console.error('[SocialDataProvider] Failed to fetch agent metrics:', error.message);
+      throw error;
+    }
+  }
+
+  async searchNews(query: string, from: string, to: string): Promise<NewsSearchResult[]> {
+    try {
+      const response = await axios.get(
+        `https://api.cookie.fun/v1/hackathon/search/${query}`,
+        {
+          params: { from, to },
+          headers: {
+            'x-api-key': this.apiKey
+          },
+          timeout: 5000
+        }
+      );
+
+      if (response.status === 200) {
+        return response.data;
+      }
+      throw new Error('Failed to fetch news search results');
+    } catch (error: any) {
+      console.error('[SocialDataProvider] Failed to fetch news:', error.message);
+      throw error;
+    }
   }
 }
