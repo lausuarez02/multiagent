@@ -20,13 +20,26 @@ export interface SocialMetrics {
       engagement_rate: number;
       activity_score: number;
     };
+    agent_metrics?: {
+      followers: number;
+      following: number;
+      tweets: number;
+      engagement: number;
+      interval: string;
+    };
+    related_news?: {
+      title: string;
+      content: string;
+      date: string;
+      source: string;
+    }[];
   };
 }
 
 let socialProvider: SocialDataProvider;
 
 export function initializeSocialProvider(isTesting = false) {
-  socialProvider = new SocialDataProvider(isTesting);
+  socialProvider = new SocialDataProvider();
 }
 
 export async function collectSocialMetrics(username?: string): Promise<SocialMetrics> {
@@ -40,7 +53,14 @@ export async function collectSocialMetrics(username?: string): Promise<SocialMet
 
   if (username) {
     try {
-      const profile = await socialProvider.getTwitterProfile(username);
+      const [profile, agentMetrics, news] = await Promise.all([
+        socialProvider.getTwitterProfile(username),
+        socialProvider.getAgentMetrics(username),
+        socialProvider.searchNews(username, 
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days ago
+          new Date().toISOString().split('T')[0] // today
+        )
+      ]);
       
       if (profile) {
         metrics.twitter = {
@@ -48,7 +68,9 @@ export async function collectSocialMetrics(username?: string): Promise<SocialMet
           analysis: {
             engagement_rate: calculateEngagementRate(profile),
             activity_score: calculateActivityScore(profile)
-          }
+          },
+          agent_metrics: agentMetrics,
+          related_news: news
         };
       }
     } catch (error) {

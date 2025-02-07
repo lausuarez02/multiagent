@@ -3,6 +3,7 @@ import { openai } from "@ai-sdk/openai";
 import { SOCIAL_REPORT_PROMPT } from "../../../prompts/socialReport";
 import { getSocialToolkit } from "./toolkit";
 import { db } from "../../../memory/db";
+import { collectSocialMetrics } from "../../../data/social";
 
 interface SocialReport {
   profile: any;
@@ -10,6 +11,18 @@ interface SocialReport {
   risk_assessment: any;
   analysis: any;
   dateRange: any;
+  agent_metrics?: {
+    followers: number;
+    following: number;
+    tweets: number;
+    engagement: number;
+  };
+  related_news?: {
+    title: string;
+    content: string;
+    date: string;
+    source: string;
+  }[];
   additionalNotes?: string[];
 }
 
@@ -36,8 +49,18 @@ export class SocialAgent {
         };
       }
 
-      console.log(`[${this.name}] received social report request:`, data.dateRange);
-      const response = await this.generateSocialReport(data);
+      // Collect metrics before generating report
+      const socialMetrics = await collectSocialMetrics(data.username);
+      
+      console.log(`[${this.name}] received social report request:`, {
+        dateRange: data.dateRange,
+        metrics: socialMetrics
+      });
+
+      const response = await this.generateSocialReport({
+        ...data,
+        metrics: socialMetrics
+      });
       
       let parsedReport: SocialReport;
       try {
@@ -52,7 +75,9 @@ export class SocialAgent {
           engagement: rawReport.engagement_metrics,
           risk_assessment: rawReport.risk_assessment,
           analysis: rawReport.analysis || {},
-          dateRange: rawReport.date_range
+          dateRange: rawReport.date_range,
+          agent_metrics: socialMetrics.twitter?.agent_metrics,
+          related_news: socialMetrics.twitter?.related_news
         };
 
         // Extract any additional notes if present
@@ -114,7 +139,7 @@ export class SocialAgent {
         messages: [
           {
             role: "user",
-            content: `Generate a social media analysis report for user ${socialData.username} during ${socialData.dateRange || '30d'}. Include engagement metrics and trends.`,
+            content: `Generate a social media analysis report for user ${socialData.username} during ${socialData.dateRange || '30d'}. Include engagement metrics, agent-specific trends, and relevant news analysis. Here is the collected data: ${JSON.stringify(socialData.metrics)}`,
           },
         ],
         tools: toolkit,

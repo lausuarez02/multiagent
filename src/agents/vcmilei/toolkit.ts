@@ -1,10 +1,12 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { NewsAgent } from "../reports/news";
+import { SocialAgent } from "../reports/social";
 import { wallet } from "../../setup";
 // Import other agents as needed
 
 const newsAgent = new NewsAgent("NewsAssistant");
+const socialAgent = new SocialAgent("SocialAssistant");
 
 // Mode token address on Mode Testnet
 const MODE_TOKEN_ADDRESS = "0x4FFa6cDEB4deF980b75e3F4764797A2CAd1fAEF3";
@@ -197,6 +199,35 @@ export const getVCMileiToolkit = () => {
               amount,
               slippage
             }
+          };
+        }
+      },
+    }),
+
+    getSocialAnalysis: tool({
+      description: "Analyzes social media profiles and metrics for specific agents or accounts",
+      parameters: z.object({
+        username: z.string().describe("Twitter username to analyze"),
+        dateRange: z.string().optional().describe("Date range for analysis (e.g., '7d', '30d')")
+      }),
+      execute: async ({ username, dateRange = '7d' }) => {
+        console.log(`[getSocialAnalysis] Analyzing social profile for: ${username}`);
+        
+        try {
+          const socialReport = await socialAgent.handleSocialRequest({
+            username,
+            dateRange
+          });
+
+          return {
+            success: true,
+            data: socialReport.data
+          };
+        } catch (error: any) {
+          console.error(`[getSocialAnalysis] Error:`, error.message);
+          return {
+            success: false,
+            error: error.message
           };
         }
       },
