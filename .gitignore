@@ -176,3 +176,5 @@ dist
 
 package-lock.json
 .vscode/
+
+data/

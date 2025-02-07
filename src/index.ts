@@ -1,103 +1,110 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
-import { app } from "./app";
-import { registerAgentFactories } from "./agents";
+import { Hono } from 'hono';
+import { createVCMileiAgent } from './agents';
+import { NotificationListener } from './jobs/listener';
+import chalk from 'chalk';
+const app = new Hono();
+const port = process.env.PORT || 3078;
 
-console.log(`[🚀] starting VCMILEI multiagent system...`);
+const startSystem = async () => {
+  console.log('[🚀] starting VCMILEI multiagent system...');
+  
+  console.log(`
+  ██╗   ██╗ ██████╗███╗   ███╗██╗██╗     ███████╗██╗
+  ██║   ██║██╔════╝████╗ ████║██║██║     ██╔════╝██║
+  ██║   ██║██║     ██╔████╔██║██║██║     █████╗  ██║
+  ╚██╗ ██╔╝██║     ██║╚██╔╝██║██║██║     ██╔══╝  ██║
+   ╚████╔╝ ╚██████╗██║ ╚═╝ ██║██║███████╗███████╗██║
+    ╚═══╝   ╚═════╝╚═╝     ╚═╝╚═╝╚══════╝╚══════╝╚═╝
+  `);
 
-// Initialize agent factories but don't run them
-const { createNewsAgent, createSocialAgent, createVCMileiAgent } = registerAgentFactories();
-
-// Set up your API endpoints to trigger the agents
-app.post('/api/news', async (c) => {
-  try {
-    const newsAgent = createNewsAgent();
-    const body = await c.req.json();
-    const response = await newsAgent.handleNewsRequest(body);
-
-    if (!response.success) {
-      return c.json({ 
-        success: false, 
-        error: response.error 
-      }, 400);
+    console.log(chalk.magenta.bgMagenta(`
+          ##%%%%#####                         
+        #%%@@%%######*                       
+        %%@@@@%%%#%%#%##                      
+      #%@@#++=-::::-%###                     
+      #%%@#+=--::::::+###                     
+      #%%*#@@%*+#%%#-%%#                     
+      %%#*%@@@*-@@@%*%%                      
+        %%*+**+=-=++=+*#                      
+        %*+=-===:-:--#                       
+        #@@*+==+=--=+%+-                      
+      #*#@@%*+===+%%#+-                      
+      ##%%%%%%@@@@@@%@@%%#*+===                  
+      @@%%%#%%%%%%%%@@@@@@%%#***++#+=                
+      %%%@@#########%%%%%##***+++*%#*=               
+      %@@@@%#***##**#%@@*******++*%%%*+              
+      %@@@@%##*******%@##**+***++*@%%%*              
+      %@@@@@%##*******#@********+*#%%%%#+             
+      @@@@%@#-====+**+*%***++====-=%%%%%+             
+      %@%@@@@@=========---==---=---+@@%%%#+            
+      @@@@@@@@@#+++=======-====-=----@@@@%%#*           
+      %@%%%%%%++++++======-=======---=*##*##**          
+      %@%@@@@*+++++++==========+++++=--+#####*          
+      **@@@@@@%**+++#%%##########*+====+#%%%%%*          
+      *#@@%@@@%@@%@%#####%%##*##%%%%#++@@@@@@#++         
+`));
+  console.log("======== Initializing VCMilei System =========");
+  
+  // Create VCMilei agent instance first
+  const vcMileiAgent = await createVCMileiAgent();
+  
+  // Initialize notification listeners for Twitter mentions
+  const notificationListener = new NotificationListener({
+    twitter: {
+      enabled: true,
+      interval: 60000,
+      callback: async (notification) => {
+        await vcMileiAgent.handleRequest({
+          type: 'general',
+          query: notification.data.text,
+          context: {
+            notificationType: 'mention',
+            fromUser: notification.data.author,
+            tweetId: notification.data.id
+          }
+        });
+      }
     }
+  });
 
-    return c.json({
-      success: true,
-      data: response.data,
-      timestamp: response.timestamp
-    }, 200);
-
-  } catch (error: any) {
-    console.error('[API] News endpoint error:', error.message);
-    return c.json({ 
-      success: false, 
-      error: error.message || 'Internal server error'
-    }, 500);
-  }
-});
-
-app.post('/api/social', async (c) => {
-  try {
-    const socialAgent = createSocialAgent();
-    const body = await c.req.json();
-    const response = await socialAgent.handleSocialRequest(body);
-
-    if (!response.success) {
-      return c.json({ 
-        success: false, 
-        error: response.error 
-      }, 400);
+  // Set up periodic news check
+  setInterval(async () => {
+    try {
+      await vcMileiAgent.handleRequest({
+        type: 'news',
+        context: {
+          notificationType: 'news_update'
+        }
+      });
+    } catch (error) {
+      console.error('[News Check] Error:', error);
     }
+  }, 1000000); // Every 5 minutes
 
-    return c.json({
-      success: true,
-      data: response.data,
-      timestamp: response.timestamp
-    }, 200);
+  await notificationListener.start();
+  console.log("======== VCMilei System Initialized =========");
 
-  } catch (error: any) {
-    console.error('[API] Social endpoint error:', error.message);
-    return c.json({ 
-      success: false, 
-      error: error.message || 'Internal server error'
-    }, 500);
-  }
-});
-
-app.post('/api/vcmilei', async (c) => {
-  try {
-    const vcmileiAgent = createVCMileiAgent();
-    const body = await c.req.json();
-    const response = await vcmileiAgent.handleRequest(body);
-
-    if (!response.success) {
-      return c.json({ 
-        success: false, 
-        error: response.error 
-      }, 400);
+  // Set up API routes
+  app.post('/api/chat', async (c) => {
+    try {
+      const body = await c.req.json();
+      const response = await vcMileiAgent.handleRequest(body);
+      return c.json(response);
+    } catch (error) {
+      console.error('Error handling request:', error);
+      return c.json({ error: 'Internal server error' }, 500);
     }
+  });
 
-    return c.json({
-      success: true,
-      data: response.data,
-      timestamp: response.timestamp
-    }, 200);
+  // Start server
+  serve({
+    fetch: app.fetch,
+    port: Number(port)
+  }, (info) => {
+    console.log(`[🚀] Server is running on http://localhost:${info.port}`);
+  });
+};
 
-  } catch (error: any) {
-    console.error('[API] VCMilei endpoint error:', error.message);
-    return c.json({ 
-      success: false, 
-      error: error.message || 'Internal server error'
-    }, 500);
-  }
-});
-
-// Start the server
-const port = process.env.PORT || 3000;
-serve({
-  fetch: app.fetch,
-  port: Number(port),
-}, (info:any) => {
-  console.log(`[🚀] Server is running on http://localhost:${info.port}`);
-});
+startSystem().catch(console.error);
