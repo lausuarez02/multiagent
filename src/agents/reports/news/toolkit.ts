@@ -5,12 +5,12 @@ import { collectNews } from "../../../data/news";
 export const getNewsToolkit = () => {
   return {
     fetchLatestNews: tool({
-      description: "Fetches the latest news articles",
+      description: "Fetches the latest news articles. If no asset is provided, returns general latest news.",
       parameters: z.object({
-        asset: z.string().optional().describe("Currency or company name to fetch news for"),
+        asset: z.string().optional().describe("Optional: Currency or company name to fetch news for. Leave empty for latest general news."),
       }),
       execute: async ({ asset }) => {
-        console.log(`[fetchLatestNews] Fetching news for currency: ${asset || 'all'}`);
+        console.log(`[fetchLatestNews] Fetching ${asset ? `news for: ${asset}` : 'latest news'}`);
         
         try {
           const newsData = await collectNews(asset);

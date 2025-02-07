@@ -133,7 +133,7 @@ export class NewsDataProvider {
 
   async getAllNews(searchTerm?: string) {
     try {
-      console.log(`[NewsProvider] Fetching news for search term: ${searchTerm || 'latest'}`);
+      console.log(`[NewsProvider] Fetching ${searchTerm ? `news for: ${searchTerm}` : 'latest news'}`);
       
       const [cryptoPanicNews, cointelegraphNews] = await Promise.all([
         this.getCryptoPanicNews(searchTerm),

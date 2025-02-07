@@ -4,7 +4,8 @@ const newsProvider = new NewsDataProvider();
 
 export async function collectNews(currency?: string) {
   try {
-    const news = await newsProvider.getAllNews(currency);
+    // If no currency specified, get latest news without any search term
+    const news = await newsProvider.getAllNews(currency || undefined);
     
     return {
       timestamp: new Date().toISOString(),
