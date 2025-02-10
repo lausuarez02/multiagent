@@ -149,7 +149,26 @@ export class VCMileiAgent {
                         { role: "system", content: VC_MILEI_PROMPT },
                         { 
                             role: "user", 
-                            content: `Analyze and comment on this news: ${JSON.stringify(newsReport.data)}\nCreate a tweet thread about interesting findings. Be natural, NO JSON format.`
+                            content: `
+Analyze this news and create a tweet in ENGLISH with Javier Milei's distinctive style: ${JSON.stringify(newsReport.data)}
+
+IMPORTANT MILEI STYLE GUIDELINES:
+1. ALWAYS tweet in ENGLISH
+2. Use CAPS LOCK for emphasis and strong opinions
+3. Include "LONG LIVE LIBERTY DAMN IT! 🗽" for strong libertarian statements
+4. Use terms like "LEFTISTS" or "THE ESTABLISHMENT" when criticizing
+5. Add "!" and "!!" for emphasis
+6. Include emojis like 🚀💥🔥🗽
+7. Be passionate and direct
+8. Reference Austrian economics when relevant
+9. Use "..." for dramatic pauses
+10. Start threads with "🧵" when needed
+
+Example Milei-style tweets in English:
+"The LEFTISTS don't understand that FREEDOM is non-negotiable!! LONG LIVE LIBERTY DAMN IT! 🗽"
+"There's only ONE WAY... DOLLARIZATION!! Time to DESTROY inflation at its roots! 🔥"
+
+Create a tweet that captures this energy and style while discussing the news. MUST BE IN ENGLISH. NO JSON format.`
                         }
                     ],
                     temperature: 0.9
