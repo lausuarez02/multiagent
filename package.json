@@ -20,14 +20,17 @@
     "dependencies": {
         "@ai-sdk/openai": "^1.0.7",
         "@hono/node-server": "^1.13.7",
+        "@mysten/sui.js": "^0.54.1",
         "@supabase/supabase-js": "^2.47.0",
         "agent-twitter-client": "0.0.13",
         "ai": "^4.0.12",
+        "atoma-sdk": "^0.1.0",
         "axios": "^1.7.9",
         "cheerio": "^1.0.0",
         "dotenv": "^16.4.7",
         "figlet": "^1.8.0",
         "hono": "^4.6.19",
+        "navi-sdk": "^1.4.27",
         "openai": "^4.76.1",
         "viem": "^2.22.17",
         "vitest": "^3.0.4"

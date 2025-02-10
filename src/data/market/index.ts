@@ -26,18 +26,26 @@ interface TokenMetrics {
   max_supply: number | null;
 }
 
+interface WalletMetrics {
+  balances: any[];
+  transactions: any[];
+  tokens: any[];
+  timestamp: string;
+}
+
 const marketDataProvider = new MarketDataProvider();
 
 export async function collectMarketData(
   tokenAddress: string,
-  network: 'solana' | 'mode'
+  network: 'solana' | 'sui'
 ) {
   try {
     // Collect all metrics in parallel
-    const [tokenMetrics, liquidityMetrics, holderMetrics] = await Promise.all([
+    const [tokenMetrics, liquidityMetrics, holderMetrics, walletMetrics] = await Promise.all([
       marketDataProvider.getTokenMetrics(tokenAddress, network),
       marketDataProvider.getLiquidityMetrics(tokenAddress, network),
-      marketDataProvider.getHolderStats(tokenAddress, network)
+      marketDataProvider.getHolderStats(tokenAddress, network),
+      marketDataProvider.getWalletData(tokenAddress, network === 'sui' ? 'sui' : 'mode')
     ]);
 
     // Calculate risk metrics based on collected data
@@ -45,6 +53,7 @@ export async function collectMarketData(
       tokenMetrics,
       liquidityMetrics,
       holderMetrics,
+      walletMetrics
     });
 
     return {
@@ -55,6 +64,7 @@ export async function collectMarketData(
         token: tokenMetrics,
         liquidity: liquidityMetrics,
         holders: holderMetrics,
+        wallet: walletMetrics
       },
       analysis: {
         liquidity_score: calculateLiquidityScore(liquidityMetrics),
@@ -72,6 +82,7 @@ function calculateRiskMetrics(data: {
   tokenMetrics: any;
   liquidityMetrics: any;
   holderMetrics: any;
+  walletMetrics: any;
 }) {
   return {
     volatility_risk: calculateVolatilityRisk(data.tokenMetrics),

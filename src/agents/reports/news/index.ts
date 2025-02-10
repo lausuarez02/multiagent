@@ -1,8 +1,11 @@
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { AtomaSDK } from "atoma-sdk";
 import { NEWS_REPORT_PROMPT } from "../../../prompts/newsReport";
 import { getNewsToolkit } from "./toolkit";
 import { db } from "../../../memory/db";
+
+const atomaSDK = new AtomaSDK({
+  bearerAuth: process.env["ATOMASDK_BEARER_AUTH"] ?? "",
+});
 
 export class NewsAgent {
   name: string;
@@ -71,37 +74,28 @@ export class NewsAgent {
    */
   async generateNewsReport(newsData: any): Promise<any> {
     try {
-      // console.log(`[${this.name}] Starting news report generation with data:`, JSON.stringify(newsData, null, 2));
-      
       const toolkit = getNewsToolkit();
-      // console.log(`[${this.name}] Toolkit initialized`);
-
-      // Create a bound version of onStepFinish that preserves 'this' context
       const boundOnStepFinish = this.onStepFinish.bind(this);
 
-      const response = await generateText({
-        model: openai("gpt-4o-mini"),
-        system: NEWS_REPORT_PROMPT,
+      const completion = await atomaSDK.chat.create({
         messages: [
+          { role: "system", content: NEWS_REPORT_PROMPT },
           {
             role: "user",
-            content: `Asset: ${newsData.asset}`,
-          },
+            content: `Asset: ${newsData.asset}`
+          }
         ],
-        tools: toolkit,
-        maxSteps: 50,
-        onStepFinish: boundOnStepFinish,  // Use the bound version
+        model: "meta-llama/Llama-3.3-70B-Instruct"
       });
 
-      // console.log(`[${this.name}] Generation completed with response:`, JSON.stringify(response, null, 2));
-      return response;
+      return {
+        text: completion.choices[0].message.content,
+        usage: completion.usage,
+        finishReason: completion.choices[0].finishReason
+      };
 
     } catch (error: any) {
-      console.error(`[${this.name}] Error in generateNewsReport:`, {
-        message: error.message,
-        stack: error.stack,
-        error
-      });
+      console.error(`[${this.name}] Error in generateNewsReport:`, error);
       throw error;
     }
   }

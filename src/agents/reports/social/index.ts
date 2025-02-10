@@ -1,9 +1,12 @@
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { AtomaSDK } from "atoma-sdk";
 import { SOCIAL_REPORT_PROMPT } from "../../../prompts/socialReport";
 import { getSocialToolkit } from "./toolkit";
 import { db } from "../../../memory/db";
 import { collectSocialMetrics } from "../../../data/social";
+
+const atomaSDK = new AtomaSDK({
+  bearerAuth: process.env["ATOMASDK_BEARER_AUTH"] ?? "",
+});
 
 interface SocialReport {
   profile: any;
@@ -133,29 +136,26 @@ export class SocialAgent {
     try {
       const toolkit = getSocialToolkit();
 
-      const response = await generateText({
-        model: openai("gpt-4o-mini", { parallelToolCalls: false }),
-        system: SOCIAL_REPORT_PROMPT,
+      const completion = await atomaSDK.chat.create({
         messages: [
+          { role: "system", content: SOCIAL_REPORT_PROMPT },
           {
             role: "user",
-            content: `Generate a social media analysis report for user ${socialData.username} during ${socialData.dateRange || '30d'}. Include engagement metrics, agent-specific trends, and relevant news analysis. Here is the collected data: ${JSON.stringify(socialData.metrics)}`,
-          },
+            content: `Generate a social media analysis report for user ${socialData.username} during ${socialData.dateRange || '30d'}. Include engagement metrics, agent-specific trends, and relevant news analysis. Here is the collected data: ${JSON.stringify(socialData.metrics)}`
+          }
         ],
-        tools: toolkit,
-        maxSteps: 50,
-        maxRetries: 10,
-        experimental_continueSteps: true,
-        onStepFinish: this.onStepFinish.bind(this),
+        model: "meta-llama/Llama-3.3-70B-Instruct"
       });
 
-      if (!response?.text) {
+      if (!completion.choices[0].message.content) {
         throw new Error('No response text from AI model');
       }
 
-      console.log('check otu all the response', response);
-
-      return response;
+      return {
+        text: completion.choices[0].message.content,
+        usage: completion.usage,
+        finishReason: completion.choices[0].finishReason
+      };
     } catch (error: any) {
       console.error(`[${this.name}] Error generating social report:`, error);
       throw new Error(error?.message || 'Failed to generate social report');

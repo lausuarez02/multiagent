@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { AtomaSDK } from "atoma-sdk";
 import { VC_MILEI_PROMPT } from "../../prompts/vcMilei";
 import { getVCMileiToolkit } from "./toolkit";
 import { db } from "../../memory/db";
@@ -7,6 +6,10 @@ import { TwitterClient } from "../../utils/twitter";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getTwitterClient } from "../../utils/twitter/singleton";
+
+const atomaSDK = new AtomaSDK({
+  bearerAuth: process.env["ATOMASDK_BEARER_AUTH"] ?? "",
+});
 
 interface ProcessedTweets {
   processedIds: string[];
@@ -108,15 +111,13 @@ export class VCMileiAgent {
 
         // For mentions/replies
         if (request.context?.notificationType === 'mention') {
-            // First check news for context
             const newsReport = await toolkit.getNewsReport.execute({
-                asset: '',  // Empty string for latest news
+                asset: '',
                 timeframe: '24h',
                 limit: 5
             }, { toolCallId: '', messages: [] });
             
-            const response = await generateText({
-                model: openai("gpt-4-turbo"),
+            const completion = await atomaSDK.chat.create({
                 messages: [
                     { role: "system", content: VC_MILEI_PROMPT },
                     { 
@@ -124,41 +125,55 @@ export class VCMileiAgent {
                         content: `Context: ${JSON.stringify(newsReport.data)}\n\nSomeone tweeted at you: "${request.query}"\nRespond naturally as VCMilei, using relevant news context if applicable. NO JSON, NO ANALYSIS STRUCTURE, just a natural tweet response.`
                     }
                 ],
-                temperature: 0.9
+                model: "meta-llama/Llama-3.3-70B-Instruct"
             });
 
             // Reply to the tweet
             if (request.context.tweetId) {
-                await this.twitter.replyToTweet(response.text, request.context.tweetId);
+                await this.twitter.replyToTweet(completion.choices[0].message.content, request.context.tweetId);
             }
-            return { text: response.text };
+            return { text: completion.choices[0].message.content };
         }
         
         // For news updates
         if (request.type === 'news') {
             const newsReport = await toolkit.getNewsReport.execute({
-              asset: '',  // Empty string for latest news
-              timeframe: '24h',
-              limit: 5
-          }, { toolCallId: '', messages: [] });  // Empty query for latest news
+                asset: '',
+                timeframe: '24h',
+                limit: 5
+            }, { toolCallId: '', messages: [] });
             
             if (newsReport.success && newsReport.data) {
-                const response = await generateText({
-                    model: openai("gpt-4-turbo"),
+                const completion = await atomaSDK.chat.create({
                     messages: [
                         { role: "system", content: VC_MILEI_PROMPT },
                         { 
                             role: "user", 
-                            content: `Analyze and comment on this news: ${JSON.stringify(newsReport.data)}\nCreate a tweet thread about interesting findings. Be natural, NO JSON format.`
+                            content: `
+Analyze this news and create a tweet in ENGLISH with Javier Milei's distinctive style: ${JSON.stringify(newsReport.data)}
+
+IMPORTANT MILEI STYLE GUIDELINES:
+1. ALWAYS tweet in ENGLISH
+2. Use CAPS LOCK for emphasis and strong opinions
+3. Include "LONG LIVE LIBERTY DAMN IT! 🗽" for strong libertarian statements
+4. Use terms like "LEFTISTS" or "THE ESTABLISHMENT" when criticizing
+5. Add "!" and "!!" for emphasis
+6. Include emojis like 🚀💥🔥🗽
+7. Be passionate and direct
+8. Reference Austrian economics when relevant
+9. Use "..." for dramatic pauses
+10. Start threads with "🧵" when needed
+
+Create a tweet that captures this energy and style while discussing the news. MUST BE IN ENGLISH. NO JSON format.`
                         }
                     ],
-                    temperature: 0.9
+                    model: "meta-llama/Llama-3.3-70B-Instruct"
                 });
 
-                if (response.text.trim()) {
-                    await this.twitter.postTweetThread([response.text]);
+                if (completion.choices[0].message.content.trim()) {
+                    await this.twitter.postTweetThread([completion.choices[0].message.content]);
                 }
-                return { text: response.text };
+                return { text: completion.choices[0].message.content };
             }
         }
 
@@ -177,8 +192,7 @@ export class VCMileiAgent {
     try {
       // If it's a mention/reply, format as a conversational response
       if (request.context?.notificationType === 'mention') {
-        const response = await generateText({
-          model: openai("gpt-4o-mini"),
+        const response = await atomaSDK.chat.create({
           messages: [
             { role: "system", content: VC_MILEI_PROMPT },
             { 
@@ -186,11 +200,11 @@ export class VCMileiAgent {
               content: `Someone tweeted at you: "${request.query}"\nRespond naturally as VCMilei, in a conversational way. NO JSON, NO ANALYSIS STRUCTURE, just a natural tweet response.`
             }
           ],
-          temperature: 0.9
+          model: "meta-llama/Llama-3.3-70B-Instruct"
         });
 
         return {
-          text: response.text
+          text: response.choices[0].message.content
         };
       }
       
@@ -268,30 +282,29 @@ ${newsContext}
         : `Query: ${request.query}
            Expected Response Structure: ${JSON.stringify(responseStructure, null, 2)}`;
 
-      const response = await generateText({
-        model: openai("gpt-4o-mini"),
-        system: context + VC_MILEI_PROMPT,
+      const response = await atomaSDK.chat.create({
         messages: [
+          {
+            role: "system",
+            content: context + VC_MILEI_PROMPT
+          },
           {
             role: "user",
             content
           },
         ],
-        tools: toolkit,
-        maxSteps: 50,
-        temperature: 0.9,
-        onStepFinish: this.onStepFinish.bind(this),
+        model: "meta-llama/Llama-3.3-70B-Instruct"
       });
 
       // Parse and validate the response structure
-      let parsedResponse: any = response.text;
+      let parsedResponse: any = response.choices[0].message.content;
       try {
         // First try to extract JSON if the response contains both text and JSON
-        const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+        const jsonMatch = response.choices[0].message.content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           parsedResponse = JSON.parse(jsonMatch[0]);
         } else {
-          parsedResponse = JSON.parse(response.text);
+          parsedResponse = JSON.parse(response.choices[0].message.content);
         }
 
         // Merge with the expected structure to ensure all fields exist
@@ -302,7 +315,7 @@ ${newsContext}
 
         // Format the response with proper indentation and line breaks
         const formattedResponse = {
-          commentary: response.text.replace(/\{[\s\S]*\}/, '').trim(), // Extract any text before/after JSON
+          commentary: response.choices[0].message.content.replace(/\{[\s\S]*\}/, '').trim(), // Extract any text before/after JSON
           analysis: parsedResponse
         };
 
@@ -317,7 +330,7 @@ ${newsContext}
         return {
           ...response,
           text: JSON.stringify({
-            commentary: response.text,
+            commentary: response.choices[0].message.content,
             analysis: null
           }, null, 2)
         };
