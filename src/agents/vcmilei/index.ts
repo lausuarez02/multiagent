@@ -108,22 +108,17 @@ export class VCMileiAgent {
 
         // For mentions/replies
         if (request.context?.notificationType === 'mention') {
-            // First check news for context
-            const newsReport = await toolkit.getNewsReport.execute({
-                asset: '',  // Empty string for latest news
-                timeframe: '24h',
-                limit: 5
-            }, { toolCallId: '', messages: [] });
-            
             const response = await generateText({
                 model: openai("gpt-4-turbo"),
                 messages: [
                     { role: "system", content: VC_MILEI_PROMPT },
                     { 
                         role: "user", 
-                        content: `Context: ${JSON.stringify(newsReport.data)}\n\nSomeone tweeted at you: "${request.query}"\nRespond naturally as VCMilei, using relevant news context if applicable. NO JSON, NO ANALYSIS STRUCTURE, just a natural tweet response.`
+                        content: `Someone tweeted at you: "${request.query}"\nRespond naturally as VCMilei, in a conversational way. NO JSON, NO ANALYSIS STRUCTURE, just a natural tweet response. Use the news tool if context is needed`
                     }
                 ],
+                tools: toolkit,
+                maxSteps: 5,
                 temperature: 0.9
             });
 
@@ -149,7 +144,7 @@ export class VCMileiAgent {
                         { role: "system", content: VC_MILEI_PROMPT },
                         { 
                             role: "user", 
-                            content: `Analyze and comment on this news: ${JSON.stringify(newsReport.data)}\nCreate a tweet thread about interesting findings. Be natural, NO JSON format.`
+                            content: `Analyze and comment on this news: ${JSON.stringify(newsReport.data)}\nCreate a tweet about interesting findings. Be natural, NO JSON format.`
                         }
                     ],
                     temperature: 0.9
